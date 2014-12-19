@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# (C) 2014 IB | the data company
+# snapshot script for creating periodic backups of a btrfs filesystem
+#
+#
+#
+FILESYSTEM="/srv/data"
+TARGET="snaps"
+NAME="weekly"
+KEEP="3"
+HISTORY_FILE="${FILESYSTEM}/${TARGET}/.snapster/hist_${NAME}"
+HISTORY=$(cat "${HISTORY_FILE}"|sort -r)
+SNAP=`date +@GMT-%Y.%m.%d-%H.%M.%S`
+
+function snap_remove (){
+  btrfs subvolume delete ${FILESYSTEM}/${1}/${2}
+  sync
+}
+
+function snap_create () {
+  btrfs subvolume snapshot -r "${FILESYSTEM}" "${FILESYSTEM}/${TARGET}/${1}"
+  if [[ $? -eq 0 ]]
+    then
+      echo -e "${1}" >> "${HISTORY_FILE}"
+  fi
+  sync
+}
+
+function hist_remove () {
+  echo hist_remove ${1}
+  eval sed -i \'/${1}/d\' /srv/data/snaps/.snapster/hist_weekly
+}
+
+
+declare -A A_HISTORY
+declare -A A_REMOVE
+for I in $HISTORY
+  do
+    let COUNTER=COUNTER+1
+    A_HISTORY["${I}"]=${COUNTER}
+    echo -e "${I}" = "${A_HISTORY[${I}]}"
+    if [[ "${COUNTER}" -ge "${KEEP}" ]]
+      then
+        A_REMOVE["${I}"]="${COUNTER}"
+    fi
+done
+
+for I in "${!A_REMOVE[@]}"
+  do
+    echo -e "${I}" = ${A_REMOVE[$I]}
+    (btrfs subvolume show "${FILESYSTEM}/${TARGET}/${I}" 2> /dev/null)
+    if [ $? -eq 0 ]
+      then
+        echo -e "Removing $I"
+        snap_remove ${TARGET} ${I}
+        hist_remove ${I}
+      else
+        echo -e "snapshot $I doesn't exist: panic"
+        hist_remove ${I}
+    fi
+done
+
+snap_create "${SNAP}"
+
