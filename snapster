@@ -1,25 +1,69 @@
 #!/bin/bash
-#
-# (C) 2014 IB | the data company
 # snapshot script for creating periodic backups of a btrfs filesystem
-#
-#
-#
-FILESYSTEM="/srv/data"
-TARGET="snaps"
-NAME="weekly"
-KEEP="3"
-HISTORY_FILE="${FILESYSTEM}/${TARGET}/.snapster/hist_${NAME}"
-HISTORY=$(cat "${HISTORY_FILE}"|sort -r)
-SNAP=`date +@GMT-%Y.%m.%d-%H.%M.%S`
+#Set the snapshot format to the default format used by samba/vss/previous versions.
+#Example of the result: "@GMT-2014.12.17-17.41.45
+FORMAT=$(date +@GMT-%Y.%m.%d-%H.%M.%S)
+
+while getopts "hm:t:s:k:" opt; do
+  case "$opt" in
+    h)
+      show_help
+      exit 0
+      ;;
+    m)  MOUNT="${OPTARG}"
+    ;;
+    t)  TARGET="${OPTARG}"
+    ;;
+    s)  SET="${OPTARG}"
+    ;;
+    k)  KEEP="${OPTARG}"
+    ;;
+    '?')
+    show_help >&2
+    exit 1
+    ;;
+  esac
+done
+
+echo -e "${MOUNT}\n${TARGET}\n${SET}\n${KEEP}\n${FORMAT}"
+
+function check_snapster () {
+
+#Test if mount is btrfs
+  MOUNT_FS=$(/bin/df ${MOUNT} --output=fstype | sed -e 1d)
+  if [[ ! ${MOUNT_FS} == 'btrfs' ]]
+    then
+      echo -e "filesystem of ${MOUNT} is not btrfs or is not mounted!\nexiting...."
+      exit 1
+  fi
+
+#Create target folder if it doesn't exist
+  if [[ ! -d ${MOUNT}/${TARGET} ]]
+    then
+      mkdir -m 755 "${MOUNT}/${TARGET}"
+  fi
+
+#Create snapster folder if it doesn't exist
+  if [[ ! -d ${MOUNT}/${TARGET}/.snapster ]]
+    then
+      mkdir -m 755 "${MOUNT}/${TARGET}/.snapster"
+  fi
+
+#Create set history file if it doesn't exist
+  if [[ ! -f ${MOUNT}/${TARGET}/.snapster/hist_${SET} ]]
+    then
+      touch "${MOUNT}/${TARGET}/.snapster/hist_${SET}"
+  fi
+
+}
 
 function snap_remove (){
-  btrfs subvolume delete ${FILESYSTEM}/${1}/${2}
+  btrfs subvolume delete ${MOUNT}/${1}/${2}
   sync
 }
 
 function snap_create () {
-  btrfs subvolume snapshot -r "${FILESYSTEM}" "${FILESYSTEM}/${TARGET}/${1}"
+  btrfs subvolume snapshot -r "${MOUNT}" "${MOUNT}/${TARGET}/${1}"
   if [[ $? -eq 0 ]]
     then
       echo -e "${1}" >> "${HISTORY_FILE}"
@@ -29,9 +73,14 @@ function snap_create () {
 
 function hist_remove () {
   echo hist_remove ${1}
-  eval sed -i \'/${1}/d\' /srv/data/snaps/.snapster/hist_weekly
+  eval sed -i \'/${1}/d\' "${MOUNT}/${TARGET}/.snapster/hist_${SET}"
 }
 
+check_snapster
+
+HISTORY_FILE="${MOUNT}/${TARGET}/.snapster/hist_${SET}"
+HISTORY=$(cat "${HISTORY_FILE}"|sort -r)
+#exit
 
 declare -A A_HISTORY
 declare -A A_REMOVE
@@ -49,7 +98,7 @@ done
 for I in "${!A_REMOVE[@]}"
   do
     echo -e "${I}" = ${A_REMOVE[$I]}
-    (btrfs subvolume show "${FILESYSTEM}/${TARGET}/${I}" 2> /dev/null)
+    (btrfs subvolume show "${MOUNT}/${TARGET}/${I}" 2> /dev/null)
     if [ $? -eq 0 ]
       then
         echo -e "Removing $I"
@@ -61,5 +110,4 @@ for I in "${!A_REMOVE[@]}"
     fi
 done
 
-snap_create "${SNAP}"
-
+snap_create "${FORMAT}"
