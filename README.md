@@ -3,8 +3,10 @@ snapster
 
 flexible btrfs snapshot script
 
- * [Background - Why does this script exist](#Background)
- * [Parameters - Script Parameters](#Parameters)
+ * [Background - Why does this script exist](#background)
+ * [Parameters - Script Parameters](#parameters)
+ * [Examples - Script usage examples](#examples)
+ * [TODO - Script todo list](#todo)
 
 ##Background
 
@@ -40,6 +42,7 @@ Create a snapshot a day, and keep them for a week: `snapster -m /home -t .snaps 
 Create a snpashot every 15 minutes and keep 4 of them: `snapster -m /home -t .snaps -s 15_minutes -k 4`
 
 ##TODO
+Let me know if you got an idea!
 * Make everything more robust and secure?
 * Readonly snapshots are forced, make that optional
 * Add more code comments
