@@ -2,6 +2,7 @@
 # snapshot script for creating periodic backups of a btrfs filesystem
 #Set the snapshot format to the default format used by samba/vss/previous versions.
 #Example of the result: "@GMT-2014.12.17-17.41.45
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 FORMAT=$(date +@GMT-%Y.%m.%d-%H.%M.%S)
 
 while getopts "hm:t:s:k:" opt; do
